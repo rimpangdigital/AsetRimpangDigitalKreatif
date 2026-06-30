@@ -155,7 +155,7 @@ export default function App() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "Data_Aset_SERRUM.csv");
+    link.setAttribute("download", "Data_Aset_Rimpang.csv");
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -186,7 +186,7 @@ export default function App() {
       const imgData = canvas.toDataURL('image/jpeg', 0.9);
       const link = document.createElement('a');
       link.href = imgData;
-      link.download = `Laporan-Aset-SERRUM-${new Date().toISOString().split('T')[0]}.jpg`;
+      link.download = `Laporan-Aset-Rimpang-${new Date().toISOString().split('T')[0]}.jpg`;
       link.click();
     } catch (error) {
       console.error("Gagal mengekspor JPG:", error);
@@ -215,7 +215,7 @@ export default function App() {
             <Package className="w-8 h-8 text-blue-600" />
             <div>
               <h1 className="text-xl font-bold text-gray-800">Manajemen Aset</h1>
-              <p className="text-sm text-gray-500">Sistem Inventaris SERRUM</p>
+              <p className="text-sm text-gray-500">Sistem Inventaris Rimpang</p>
             </div>
           </div>
 
@@ -260,16 +260,16 @@ export default function App() {
               {/* Tempat Logo Referensi */}
               <img 
                 src="logo-rimapng.png" 
-                alt="Logo SERRUM" 
+                alt="Logo Rimpang" 
                 className="h-16 w-auto object-contain"
                 onError={(e) => {
                   e.target.onerror = null;
                   // Fallback jika gambar belum diupload di directory root
-                  e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='50' viewBox='0 0 150 50'%3E%3Crect width='150' height='50' fill='%23f3f4f6'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='16' font-weight='bold' fill='%239ca3af'%3E[Logo SERRUM]%3C/text%3E%3C/svg%3E";
+                  e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='50' viewBox='0 0 150 50'%3E%3Crect width='150' height='50' fill='%23f3f4f6'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='16' font-weight='bold' fill='%239ca3af'%3E[Logo Rimpang]%3C/text%3E%3C/svg%3E";
                 }}
               />
               <div>
-                <h1 className="text-3xl font-black tracking-tight text-gray-900">SERRUM ARTHANDLING METERIAL</h1>
+                <h1 className="text-3xl font-black tracking-tight text-gray-900">RIMPANG DIGITAL KREATIF</h1>
                 <p className="text-gray-500 font-medium tracking-widest mt-1">DAFTAR ASET & HARGA</p>
               </div>
             </div>
