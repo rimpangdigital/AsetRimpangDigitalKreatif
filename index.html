@@ -12,7 +12,7 @@
 
     <div class="max-w-6xl mx-auto bg-white p-6 rounded-xl shadow-lg">
         <header class="border-b pb-4 mb-6 flex justify-between items-center">
-            <h1 class="text-2xl font-bold text-gray-800">ASET INVENTARIS RIMPANG DIGITAL KREATIF</h1>
+            <h1 class="text-2xl font-bold text-gray-800">RIMPANG DIGITAL KREATIF</h1>
             <div class="space-x-2">
                 <button onclick="exportToExcel()" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Ekspor Excel</button>
                 <button onclick="window.print()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Print</button>
@@ -42,6 +42,12 @@
                     </tr>
                 </thead>
                 <tbody id="assetBody"></tbody>
+                <tfoot>
+                    <tr class="bg-gray-100 font-bold">
+                        <td colspan="4" class="p-3 text-right">TOTAL KESELURUHAN:</td>
+                        <td id="grandTotal" class="p-3" colspan="2">Rp 0</td>
+                    </tr>
+                </tfoot>
             </table>
         </div>
     </div>
@@ -51,21 +57,29 @@
 
         function renderAssets() {
             const body = document.getElementById('assetBody');
+            const grandTotalEl = document.getElementById('grandTotal');
             body.innerHTML = '';
+            
+            let grandTotal = 0;
             assets.forEach((item, index) => {
+                const totalItem = item.qty * item.price;
+                grandTotal += totalItem;
+                
                 body.innerHTML += `
                     <tr class="border-b">
                         <td class="p-3"><img src="${item.image}" class="w-16 h-16 object-cover rounded"></td>
                         <td class="p-3">${item.name}</td>
                         <td class="p-3">${item.qty}</td>
                         <td class="p-3">Rp ${parseInt(item.price).toLocaleString()}</td>
-                        <td class="p-3">Rp ${(item.qty * item.price).toLocaleString()}</td>
+                        <td class="p-3">Rp ${totalItem.toLocaleString()}</td>
                         <td class="p-3">
                             <button onclick="deleteAsset(${index})" class="text-red-500 hover:underline">Hapus</button>
                         </td>
                     </tr>
                 `;
             });
+            
+            grandTotalEl.innerText = `Rp ${grandTotal.toLocaleString()}`;
             localStorage.setItem('rimpang_assets', JSON.stringify(assets));
         }
 
@@ -85,7 +99,11 @@
                 document.getElementById('assetForm').reset();
             };
             
-            if(file) reader.readAsDataURL(file);
+            if(file) {
+                reader.readAsDataURL(file);
+            } else {
+                alert("Mohon pilih gambar aset.");
+            }
         });
 
         function deleteAsset(index) {
