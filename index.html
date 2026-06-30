@@ -1,0 +1,477 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+  Plus, Printer, Download, Image as ImageIcon, 
+  Edit, Trash2, Save, X, Search, FileSpreadsheet,
+  Package
+} from 'lucide-react';
+
+export default function App() {
+  // State untuk menyimpan daftar item. Memuat dari localStorage saat inisialisasi.
+  const [items, setItems] = useState(() => {
+    const saved = localStorage.getItem('serrum_assets');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        return [];
+      }
+    }
+    return [];
+  });
+
+  // State untuk kontrol UI
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isHtml2CanvasLoaded, setIsHtml2CanvasLoaded] = useState(false);
+  
+  // State untuk form input
+  const [formData, setFormData] = useState({
+    id: null,
+    name: '',
+    detail: '',
+    qty: 1,
+    price: 0,
+    image: null
+  });
+
+  // Load library html2canvas secara dinamis untuk fitur Export JPG
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
+    script.async = true;
+    script.onload = () => setIsHtml2CanvasLoaded(true);
+    document.body.appendChild(script);
+
+    return () => {
+      document.body.removeChild(script);
+    };
+  }, []);
+
+  // Simpan ke localStorage setiap kali items berubah
+  useEffect(() => {
+    localStorage.setItem('serrum_assets', JSON.stringify(items));
+  }, [items]);
+
+  // Format ke Rupiah
+  const formatRupiah = (number) => {
+    return new Intl.NumberFormat('id-ID', {
+      style: 'currency',
+      currency: 'IDR',
+      minimumFractionDigits: 0
+    }).format(number);
+  };
+
+  // Handler untuk mengunggah gambar dan mengubahnya ke Base64
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Peringatan ukuran file untuk localStorage
+      if (file.size > 2 * 1024 * 1024) { // 2MB limit warning
+        alert("Ukuran gambar terlalu besar. Disarankan di bawah 2MB agar penyimpanan browser (localStorage) tidak penuh.");
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData({ ...formData, image: reader.result });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Handler form
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData({ 
+      ...formData, 
+      [name]: name === 'qty' || name === 'price' ? Number(value) : value 
+    });
+  };
+
+  const openModal = (item = null) => {
+    if (item) {
+      setFormData(item);
+    } else {
+      setFormData({ id: null, name: '', detail: '', qty: 1, price: 0, image: null });
+    }
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setFormData({ id: null, name: '', detail: '', qty: 1, price: 0, image: null });
+  };
+
+  const saveItem = (e) => {
+    e.preventDefault();
+    if (!formData.name) return alert("Nama barang wajib diisi!");
+
+    if (formData.id) {
+      // Update data existing
+      setItems(items.map(item => item.id === formData.id ? { ...formData } : item));
+    } else {
+      // Tambah data baru
+      setItems([...items, { ...formData, id: Date.now() }]);
+    }
+    closeModal();
+  };
+
+  const deleteItem = (id) => {
+    if (window.confirm('Apakah Anda yakin ingin menghapus item ini?')) {
+      setItems(items.filter(item => item.id !== id));
+    }
+  };
+
+  // Filter pencarian
+  const filteredItems = useMemo(() => {
+    return items.filter(item => 
+      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.detail.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [items, searchTerm]);
+
+  const totalAssetValue = useMemo(() => {
+    return items.reduce((total, item) => total + (item.price * item.qty), 0);
+  }, [items]);
+
+  // Fitur Export & Print
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleExportExcel = () => {
+    const headers = ['ID', 'Nama Material', 'Detail Spesifikasi', 'Kuantitas', 'Harga Satuan', 'Total Harga'];
+    const rows = items.map(item => [
+      item.id,
+      `"${item.name.replace(/"/g, '""')}"`,
+      `"${item.detail.replace(/"/g, '""')}"`,
+      item.qty,
+      item.price,
+      item.qty * item.price
+    ]);
+
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + headers.join(',') + "\n" 
+      + rows.map(e => e.join(',')).join("\n");
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "Data_Aset_SERRUM.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleExportJPG = async () => {
+    if (!isHtml2CanvasLoaded || !window.html2canvas) {
+      alert("Sistem masih memuat komponen gambar. Silakan coba beberapa detik lagi.");
+      return;
+    }
+
+    try {
+      const element = document.getElementById('printable-area');
+      
+      // Sembunyikan elemen kolom aksi sementara untuk screenshot
+      const actionCells = document.querySelectorAll('.action-col');
+      actionCells.forEach(cell => cell.style.display = 'none');
+
+      const canvas = await window.html2canvas(element, { 
+        scale: 2, // High resolution
+        useCORS: true,
+        backgroundColor: '#ffffff' 
+      });
+
+      // Kembalikan elemen kolom aksi
+      actionCells.forEach(cell => cell.style.display = '');
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.9);
+      const link = document.createElement('a');
+      link.href = imgData;
+      link.download = `Laporan-Aset-SERRUM-${new Date().toISOString().split('T')[0]}.jpg`;
+      link.click();
+    } catch (error) {
+      console.error("Gagal mengekspor JPG:", error);
+      alert("Terjadi kesalahan saat mengekspor JPG.");
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
+      
+      {/* CSS Khusus untuk Print */}
+      <style dangerouslySetInnerHTML={{__html: `
+        @media print {
+          body { background: white; }
+          .no-print { display: none !important; }
+          .print-only { display: block !important; }
+          #printable-area { box-shadow: none !important; margin: 0 !important; padding: 0 !important; }
+          .action-col { display: none !important; }
+        }
+      `}} />
+
+      {/* Header & Controls (Sembunyi saat print) */}
+      <div className="max-w-7xl mx-auto p-4 md:p-8 no-print">
+        <div className="flex flex-col md:flex-row justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-6 gap-4">
+          <div className="flex items-center gap-3">
+            <Package className="w-8 h-8 text-blue-600" />
+            <div>
+              <h1 className="text-xl font-bold text-gray-800">Manajemen Aset</h1>
+              <p className="text-sm text-gray-500">Sistem Inventaris Rimpang</p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <button onClick={() => openModal()} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+              <Plus size={18} /> Tambah Aset
+            </button>
+            <button onClick={handlePrint} className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg font-medium transition-colors">
+              <Printer size={18} /> Cetak
+            </button>
+            <button onClick={handleExportExcel} className="flex items-center gap-2 bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 px-4 py-2 rounded-lg font-medium transition-colors">
+              <FileSpreadsheet size={18} /> Excel (CSV)
+            </button>
+            <button onClick={handleExportJPG} className="flex items-center gap-2 bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 px-4 py-2 rounded-lg font-medium transition-colors">
+              <Download size={18} /> Unduh JPG
+            </button>
+          </div>
+        </div>
+
+        {/* Search Bar */}
+        <div className="relative mb-6">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Search size={18} className="text-gray-400" />
+          </div>
+          <input
+            type="text"
+            placeholder="Cari nama atau detail material..."
+            className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all shadow-sm"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+      </div>
+
+      {/* Area yang akan dicetak/diekspor */}
+      <div className="max-w-7xl mx-auto px-4 md:px-8 pb-12">
+        <div id="printable-area" className="bg-white rounded-xl shadow-md p-6 md:p-10 border border-gray-100">
+          
+          {/* Header Laporan (Terlihat di layar & Print) */}
+          <div className="flex flex-col md:flex-row justify-between items-center border-b-2 border-gray-200 pb-6 mb-6">
+            <div className="flex items-center gap-4 mb-4 md:mb-0">
+              {/* Tempat Logo Referensi */}
+              <img 
+                src="logo-rimapng.png" 
+                alt="Logo SERRUM" 
+                className="h-16 w-auto object-contain"
+                onError={(e) => {
+                  e.target.onerror = null;
+                  // Fallback jika gambar belum diupload di directory root
+                  e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='50' viewBox='0 0 150 50'%3E%3Crect width='150' height='50' fill='%23f3f4f6'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='16' font-weight='bold' fill='%239ca3af'%3E[Logo SERRUM]%3C/text%3E%3C/svg%3E";
+                }}
+              />
+              <div>
+                <h1 className="text-3xl font-black tracking-tight text-gray-900">Rimpang Digital Kreatif</h1>
+                <p className="text-gray-500 font-medium tracking-widest mt-1">DAFTAR ASET & HARGA</p>
+              </div>
+            </div>
+            
+            <div className="text-right text-sm">
+              <p className="text-gray-500">Tanggal Cetak:</p>
+              <p className="font-semibold text-gray-800">{new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+            </div>
+          </div>
+
+          {/* Tabel Data */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-gray-50 text-gray-600 text-sm uppercase tracking-wider">
+                  <th className="p-4 rounded-tl-lg font-semibold border-b">Gambar</th>
+                  <th className="p-4 font-semibold border-b">Nama & Detail Material</th>
+                  <th className="p-4 font-semibold border-b text-center">Qty</th>
+                  <th className="p-4 font-semibold border-b text-right">Harga Satuan</th>
+                  <th className="p-4 font-semibold border-b text-right">Total</th>
+                  <th className="p-4 font-semibold border-b text-center action-col rounded-tr-lg">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filteredItems.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" className="p-12 text-center text-gray-400">
+                      <div className="flex flex-col items-center justify-center">
+                        <Package size={48} className="mb-4 opacity-20" />
+                        <p>Belum ada data material. Silakan tambah data baru.</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredItems.map((item, index) => (
+                    <tr key={item.id} className="hover:bg-gray-50/50 transition-colors group">
+                      <td className="p-4 align-top w-32">
+                        {item.image ? (
+                          <img src={item.image} alt={item.name} className="w-24 h-24 object-cover rounded-lg border border-gray-200 shadow-sm" />
+                        ) : (
+                          <div className="w-24 h-24 bg-gray-100 rounded-lg flex items-center justify-center border border-dashed border-gray-300">
+                            <ImageIcon className="text-gray-400" />
+                          </div>
+                        )}
+                      </td>
+                      <td className="p-4 align-top">
+                        <p className="font-bold text-gray-800 text-lg mb-1">{item.name}</p>
+                        <p className="text-gray-500 text-sm whitespace-pre-line leading-relaxed">{item.detail}</p>
+                      </td>
+                      <td className="p-4 align-top text-center">
+                        <span className="inline-block bg-blue-100 text-blue-800 px-3 py-1 rounded-full font-bold">
+                          {item.qty}
+                        </span>
+                      </td>
+                      <td className="p-4 align-top text-right font-medium text-gray-600">
+                        {formatRupiah(item.price)}
+                      </td>
+                      <td className="p-4 align-top text-right font-bold text-gray-900">
+                        {formatRupiah(item.price * item.qty)}
+                      </td>
+                      <td className="p-4 align-top text-center action-col">
+                        <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={() => openModal(item)} className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors" title="Edit">
+                            <Edit size={16} />
+                          </button>
+                          <button onClick={() => deleteItem(item.id)} className="p-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg transition-colors" title="Hapus">
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+              {filteredItems.length > 0 && (
+                <tfoot>
+                  <tr className="bg-gray-50 font-bold">
+                    <td colSpan="4" className="p-4 text-right rounded-bl-lg text-gray-700">TOTAL NILAI KESELURUHAN ASET:</td>
+                    <td className="p-4 text-right text-lg text-blue-700">{formatRupiah(totalAssetValue)}</td>
+                    <td className="action-col rounded-br-lg"></td>
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {/* Modal Form Tambah/Edit */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 no-print">
+          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex justify-between items-center z-10">
+              <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                {formData.id ? <Edit size={20} className="text-blue-600"/> : <Plus size={20} className="text-blue-600"/>}
+                {formData.id ? 'Edit Material / Aset' : 'Tambah Material Baru'}
+              </h2>
+              <button onClick={closeModal} className="p-2 hover:bg-gray-100 rounded-full text-gray-500 transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+            
+            <form onSubmit={saveItem} className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Nama Material</label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none"
+                    placeholder="Contoh: Bor Listrik Makita, Kayu Triplek 12mm..."
+                    required
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Detail Spesifikasi / Kondisi</label>
+                  <textarea
+                    name="detail"
+                    value={formData.detail}
+                    onChange={handleInputChange}
+                    rows="3"
+                    className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none"
+                    placeholder="Deskripsikan kondisi, merk, ukuran, dll..."
+                  ></textarea>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Kuantitas</label>
+                  <input
+                    type="number"
+                    name="qty"
+                    min="1"
+                    value={formData.qty}
+                    onChange={handleInputChange}
+                    className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Harga Satuan (Rp)</label>
+                  <input
+                    type="number"
+                    name="price"
+                    min="0"
+                    value={formData.price}
+                    onChange={handleInputChange}
+                    className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none"
+                    required
+                  />
+                </div>
+
+                <div className="md:col-span-2 mt-2">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Foto / Gambar Material (Opsional)</label>
+                  <div className="flex items-center gap-6 p-4 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors">
+                    {formData.image && (
+                      <div className="relative w-24 h-24 flex-shrink-0">
+                        <img src={formData.image} alt="Preview" className="w-full h-full object-cover rounded-lg shadow-sm border border-gray-200" />
+                        <button 
+                          type="button" 
+                          onClick={() => setFormData({...formData, image: null})}
+                          className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full shadow hover:bg-red-600"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 transition-colors"
+                      />
+                      <p className="text-xs text-gray-500 mt-2">Format: JPG, PNG. Rekomendasi ukuran maks 2MB.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-8 flex justify-end gap-3 border-t border-gray-100 pt-6">
+                <button
+                  type="button"
+                  onClick={closeModal}
+                  className="px-6 py-2.5 rounded-xl border border-gray-300 text-gray-700 font-medium hover:bg-gray-50 transition-colors"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 shadow-md shadow-blue-200 transition-colors flex items-center gap-2"
+                >
+                  <Save size={18} /> Simpan Data
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
